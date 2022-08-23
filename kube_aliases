@@ -1,0 +1,166 @@
+#kube
+alias kx='kubectx'
+alias k='kubectl'
+alias ku='k'
+alias kub='k'
+alias kube='k'
+alias kubec='k'
+alias kubect='k'
+alias context='k config current-context'
+alias x='k config current-context'
+alias get='k get'
+alias delete='k delete'
+alias logs='k logs'
+alias edit='k edit'
+alias rollout='k rollout'
+alias scale='k scale'
+alias describe='k describe'
+alias cordon='k cordon'
+alias uncordon='k uncordon'
+alias taint='taint'
+alias nodes='get nodes --no-headers'
+alias drain='k drain'
+alias ctx='k config get-contexts'
+alias namespace='k config set-context --current --namespace '
+alias namespaces='get namespaces --no-headers'
+alias ns='namespaces'
+alias pods='get pods --no-headers'
+alias p='pods'
+alias podsw='p -w --no-headers'
+alias pw='podsw'
+alias po='pods'
+alias pw='pods -w'
+alias deployments='get deployments --no-headers'
+alias deployment='deployments'
+alias depl='deployments'
+alias daemonsets='get daemonsets --no-headers'
+alias daemon='daemonsets'
+alias ds='daemonsets'
+alias services='get services --no-headers'
+alias svc='services'
+alias configmaps='get cm --no-headers'
+alias configs='configmaps'
+alias jobs='get jobs --no-headers'
+alias j='jobs'
+alias job='j'
+alias jo='j'
+alias del='delete'
+alias delf='del --grace-period 0 --force'
+alias dj='del job'
+alias dp='del pod'
+alias hpa='get hpa --no-headers'
+alias virtualservices='get vs --no-headers'
+alias vs='virtualservices'
+alias gateways='get gateway --no-headers'
+alias gate='gateways'
+alias gateway='gate'
+alias ingresses='get ingresses --no-headers'
+alias ingr='ingresses'
+alias ingress='ingr'
+alias ingres='ingr'
+alias ingre='ingr'
+alias secrets='get secrets --no-headers'
+alias sec='secrets'
+alias secret='sec'
+alias ed='edit deployment'
+alias restart='rollout restart deployment'
+alias all='get all --all-namespaces'
+alias de='describe'
+alias des='de'
+alias clusterinfo='k cluster-info'
+alias endpoints='get endpoints --no-headers'
+alias ep='get endpoints --no-headers'
+alias clusterrole='get clusterrole --no-headers'
+alias cr='clusterrole'
+alias clusterrolebinding='get clusterrolebinding --no-headers'
+alias crb='clusterrolebinding'
+alias serviceaccount='get serviceaccount --no-headers'
+alias sa='serviceaccount'
+alias poddisruptionbudget='get poddisruptionbudget --no-headers'
+alias pdb='poddisruptionbudget'
+alias events='get events'
+alias kcp='kubectl cp'
+
+function n() {
+  namespace $1;
+}
+
+function remove_terminating() {
+  for p in $(kubectl get pods | grep Terminating | awk '{print $1}'); do kubectl delete pod $p --grace-period=0 --force;done
+}
+function remove_error() {
+  for p in $(kubectl get pods | grep Error | awk '{print $1}'); do kubectl delete pod $p --grace-period=0 --force;done
+}
+
+function kstat() {
+  for node in  $(get nodes | tail -n +2 | awk '{print $1}'); do 
+      echo $node
+      echo -e "$(describe node $node | grep -A 4 "Allocated resources")\n";
+  done
+}
+#
+function pod() { 
+    get pod --all-namespaces -o wide | awk '{print $2,$3,$4,$5, $6, $1}' | column -t | grep $@;
+}
+
+function crashes() {
+    pod 'Crash\|Error\|ImagePullBackOff';
+}
+alias crashe='crashes'
+alias crash='crashes'
+alias cras='crashes'
+alias cra='crashes'
+
+function kcph() { k exec -ti $@ -- sh -c 'apk -q update; apk add -q curl jq; curl localhost:8080/__health | jq'; }
+
+function kbash(){ 
+      namespace=`pods -o wide --all-namespaces | grep $@ | awk '{print $1}'`;
+      k exec -ti $@ bash -n $namespace; 
+}
+function ksh(){ 
+      namespace=`pods -o wide --all-namespaces | grep $@ | awk '{print $1}'`;
+      k exec -ti $@ sh -n $namespace; 
+}
+
+function toolbox(){
+    TOOLBOX_POD_NAME='toolbox-ion'
+    TOOLBOX_CONTAINER_NAME='toolbox'
+    TOOLBOX_NAMESPACE='ion'
+
+    if [ -z "$TOOLBOX_IMAGE" ]
+    then
+      TOOLBOX_IMAGE='travelping/nettools';
+    fi
+
+    POD_EXISTS=`p toolbox-ion`;
+    if [ -z "$POD_EXISTS" ]
+    then
+      k create ns $TOOLBOX_NAMESPACE;
+
+      cat <<EOF | k apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $TOOLBOX_POD_NAME
+  namespace: $TOOLBOX_NAMESPACE
+spec:
+  containers:
+  - name: $TOOLBOX_CONTAINER_NAME
+    image: $TOOLBOX_IMAGE
+    imagePullPolicy: IfNotPresent
+  restartPolicy: Always
+EOF
+
+      while [[ $(k get pods $TOOLBOX_POD_NAME -n $TOOLBOX_NAMESPACE -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') != "True" ]]; do echo "toolbox initializing, be patient..." && sleep 1; done
+      k exec -it $TOOLBOX_POD_NAME -n $TOOLBOX_NAMESPACE -c $TOOLBOX_CONTAINER_NAME -- bash -c tmux
+    else
+      k exec -it $TOOLBOX_POD_NAME -n $TOOLBOX_NAMESPACE -c $TOOLBOX_CONTAINER_NAME -- bash -c tmux
+    fi
+}
+
+function container_versions(){
+  kubectl get pods -o jsonpath="{..image}" |tr -s '[[:space:]]' '\n' |sort |uniq -c
+}
+alias helmfile2='helmfile --helm-binary /usr/local/bin/helm2'
+alias hdiff='helmfile diff'
+alias happly='helmfile apply'
